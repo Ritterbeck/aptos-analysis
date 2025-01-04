@@ -243,4 +243,31 @@ module aptos_std::math64
 
         min(res, x / res);
     }
+
+    /*
+     * There is a comment explaining the logic in the else block. The logic
+     * pertains to overflow issues. I need to better understand this.
+     * -Brent A. Ritterbeck; 20250104
+     */
+    public inline
+    fun ceil_div(x: u64, y: u64) : u64
+    {
+        if(x == 0)
+        {
+            /*
+             * Why is this assert not outside the if-else?
+             * -Brent A. Ritterbeck; 20250104
+             */
+            assert!(y != 0, std::error::invalid_argument(4));
+            0
+        }
+        else
+        {
+            (x - 1) / y + 1
+        }
+    }
+
+    /*
+     * TEST CODE GOES HERE
+     */
 }
