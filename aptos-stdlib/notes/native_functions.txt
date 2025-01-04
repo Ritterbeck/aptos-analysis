@@ -1,0 +1,24 @@
+https://move-language.github.io/move/functions.html
+
+/*
+ * The following text is verbatim.
+ * -Brent A. Ritterbeck; 20250104
+ */
+
+Native Functions
+
+Some functions do not have a body specified, and instead have the body provided
+by the VM. These functions are marked native.
+
+Without modifying the VM source code, a programmer cannot add new native
+functions. Furthermore, it is the intent that native functions are used for
+either standard library code or for functionality needed for the given Move
+environment.
+
+Most native functions you will likely see are in the standard library code such
+as vector
+
+module std::vector {
+    native public fun empty<Element>(): vector<Element>;
+    ...
+}
