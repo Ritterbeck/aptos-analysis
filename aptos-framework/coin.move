@@ -255,6 +255,112 @@ module aptos_framework::coin
      **************************************************************************/
 
     /*
+     * Returns the balance of `owner` for provdied `CoinType` and its paried
+     * FA if exists.
+     */
+    #[view]
+    public fun
+    balance<CoinType>(owner: address) : u64
+    acquires CoinConversionMap, CoinStore
+    {
+        let paired_metadata = paired_metadata<CoinType>();
+
+        coin_balance<CoinType>(owner)
+            + if(option::is_some(&paired_metadata))
+                {
+                    primary_fungible_store::balance(owner,
+                        option::extract(&mut paired_metadata)
+                    )
+                }
+                else
+                {
+                    0
+                }
+        
+    }
+
+    /*
+     * Returns `true` if `account_addr` is registered to receive `CoinType`.
+     */
+    #[view]
+    public fun
+    is_account_registered<CoinType>(account_addr: address) : bool
+    acquires CoinConversionMap
+    {
+        assert!(is_coin_initialized<CoinType>(),
+            error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED));
+
+        if(exists<CoinStore<CoinType>>(account_addr))
+        {
+            true
+        }
+        else
+        {
+            let paired_metadata_opt = paired_metadata<CoinType>();
+            (option::is_some(&paired_metadata_opt)
+                && can_receive_paired_fungible_asset(account_addr,
+                    option::destroy_some(paired_metadata_opt)))
+        }
+    }
+
+    /*
+     * Returns whether the balance of `owner` for provided `CoinType` and its
+     * paired FA is >= `amount`.
+     */
+    #[view]
+    public fun
+    is_balance_at_least<CoinType>(owner: address, amount: u64) : bool
+    acquires CoinConversionMap, CoinStore
+    {
+        let coin_balance = coin_balance<CoinType>(owner);
+        if(coin_balance >= amount)
+        {
+            return true
+        };
+
+        let paired_metadata = paired_metadata<CoinType>();
+        let left_amount     = amount - coin_balance;
+
+        if(option::is_some(&paired_metadata))
+        {
+            primary_fungible_store::is_balance_at_least(owner,
+                option::extract(&mut paired_metadata), left_amount)
+        }
+        else
+        {
+            false
+        }
+    }
+
+    /*
+     * Returns `true` if the `CoinType` is an initialized coin.
+     */
+    #[view]
+    public fun
+    is_coin_initialized<CoinType>() : bool
+    {
+        exists<CoinInfo<CoinType>>(coin_address<CoinType>())
+    }
+
+    /*
+     * Returns `true` if account_addr has frozen the CoinStore or if it's not
+     * registered at all
+     */
+    #[view]
+    public fun
+    is_coin_store_frozen<CoinType>(account_addr: address) : bool
+    acquires CoinStore, CoinConversionMap
+    {
+        if(!is_account_registered<CoinType>(account_addr))
+        {
+            return true
+        };
+
+        let coin_store = borrow_global<CoinStore<CoinType>>(account_addr);
+        coin_store.frozen
+    }
+
+    /*
      * Get the paired coin type of a fungible asset metadata object.
      */
     #[view]
@@ -295,4 +401,59 @@ module aptos_framework::coin
 
         option::none()
     }
+
+    /*
+     * Check wheter `BurnRef` still exists.
+     */
+    #[view]
+    public fun
+    paired_burn_ref_exists<CoinType>() : bool
+    acquires CoinConversionMap, PairedFungibleAssetRefs
+    {
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = object_address(&metadata);
+
+        assert!(exists<PairedFungibleAssetRefs>(metadata_addr,
+            error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
+
+        option::is_some(&borrow_global<PairedFungibleAssetRefs>(metadata_addr)
+            .burn_ref_opt)
+    }
+
+    /*
+     * Check wheter `MintRef` still exists.
+     */
+    #[view]
+    public fun
+    paired_mint_ref_exists<CoinType>() : bool
+    acquires CoinConversionMap, PairedFungibleAssetRefs
+    {
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = object_address(&metadata);
+
+        assert!(exists<PairedFungibleAssetRefs>(metadata_addr,
+            error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
+
+        option::is_some(&borrow_global<PairedFungibleAssetRefs>(metadata_addr)
+            .mint_ref_opt)
+    }
+
+    /*
+     * Check wheter `TransferRef` still exists.
+     */
+    #[view]
+    public fun
+    paired_transfer_ref_exists<CoinType>() : bool
+    acquires CoinConversionMap, PairedFungibleAssetRefs
+    {
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = object_address(&metadata);
+
+        assert!(exists<PairedFungibleAssetRefs>(metadata_addr,
+            error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
+
+        option::is_some(&borrow_global<PairedFungibleAssetRefs>(metadata_addr)
+            .transfer_ref_opt)
+    }
+
 }
