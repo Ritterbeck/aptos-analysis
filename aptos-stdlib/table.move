@@ -118,4 +118,38 @@ module aptos_std::table
          */
         contains_box<K, V, Box<V>>(self, key)
     }
+
+    /*
+     * Internal API
+     */
+    struct Box<V> has key, drop, store
+    {
+        val: V
+    }
+
+    native fun
+    new_table_handle<K, V>(): address;
+
+    native fun
+    add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
+
+    native fun
+    borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
+
+    native fun
+    borrow_box_mut<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K)
+    : &mut Box<V>;
+
+    native fun
+    contains_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K) : bool;
+
+    native fun
+    remove_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K)
+    : Box<V>;
+
+    native fun
+    destroy_empty_box<K: copy + drop, V, B>(table: &Table<K, V>);
+
+    native fun
+    drop_unchecked_box<K: copy + drop, V, B>(table: Table<K, V>);
 }
