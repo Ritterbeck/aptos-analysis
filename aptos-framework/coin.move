@@ -29,6 +29,32 @@ module aptos_framework::coin
      *
      * ERRORS
      *
+     * 01: Address of account which is used to initialize a `CoinType` doesn't
+     *     match the deployer of the module
+     * 02: `CoinType` is already initialized as a coin
+     * 03: `CoinType` hasn't been initialized as a coin
+     * 04: DEPRECATED
+     * 05: Account hasn't registered `CoinStore` for `CoinType`
+     * 06: Not enough coins to complete transaction
+     * 07: Cannot destroy non-zero coins
+     * 08: NOT ASSIGNED
+     * 09: NOT ASSIGNED
+     * 10: CoinStore is frozen. Coins cannot be deposited or withdrawn
+     * 11: Cannot upgrade the total supply of coins to different implementation
+     * 12: Name of the coin is too long
+     * 13: Symbol of the coin is too long
+     * 14: The value of aggregatable coin used for transaction fees
+     *     redistribution does not fit in u64
+     * 15: Error regarding paired coin type of the fungible asset metadata
+     * 16: Erorr regarding paired fungible asset metadata of a coin type
+     * 17: The coin type from the map does not match th calling function type
+     *     argument
+     * 18: The feature of migration from coin to fungible asset is not enabled
+     * 19: PairedFungibleAssetRefs resource does not exist
+     * 20: The MintRefReceipt does not match the MintRef to be return
+     * 21: The MintRef does not exist
+     * 22: The TransferRefReceipt does not match the TransferRef to be returned
+     * 23: The TransferRef does not exist
      * 24: The BurnRefReceipt dos not match the BurnRef to be returned
      * 25: The BurnRef does not exist
      * 26: The migration process from coin to fungible asset is not enabled yet
@@ -250,6 +276,14 @@ module aptos_framework::coin
 
     /***************************************************************************
      *
+     * PUBLIC ENTRY FUNCTIONS
+     *
+     **************************************************************************/
+
+
+
+    /***************************************************************************
+     *
      * VIEW FUNCTIONS
      *
      **************************************************************************/
@@ -276,7 +310,45 @@ module aptos_framework::coin
                 {
                     0
                 }
-        
+    }
+
+    /*
+     * Returns the amount of coin in existence.
+     *
+     * I need to better understand the option_aggregator used in this function.
+     * -Brent A. Ritterbeck; 20250107
+     */
+    #[view]
+    pub fun
+    coin_supply<CoinType>() : Option<u128>
+    acquires CoinInfo
+    {
+        let maybe_supply =
+            &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+
+        if(option::is_some(maybe_supply))
+        {
+            let supply = option::borrow(maybe_supply);
+            let value  = optional_aggregator::read(supply);
+            option::some(value)
+        }
+        else
+        {
+            option::none()
+        }
+    }
+
+    /*
+     * Returns the number of decimals used to get its user representation.
+     * For example, if `decimals` equals `2`, a balance of `505` coins should
+     * be displayed to a user as `5.05` (`505 / 10 ** 2`).
+     */
+    #[view]
+    pub fun
+    decimals<CoinType>() : u8
+    acquires CoinInfo
+    {
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).decimals
     }
 
     /*
@@ -358,6 +430,17 @@ module aptos_framework::coin
 
         let coin_store = borrow_global<CoinStore<CoinType>>(account_addr);
         coin_store.frozen
+    }
+
+    /*
+     * Return the name of the coin.
+     */
+    #[view]
+    public fun
+    name<CoinType>() : string::String
+    acquires CoinInfo
+    {
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).name
     }
 
     /*
@@ -456,4 +539,54 @@ module aptos_framework::coin
             .transfer_ref_opt)
     }
 
+    /*
+     * Returns the amount of coin in existence.
+     *
+     * There are two main paths through this function.
+     * (1) Assume there is no metadata. Since there is no metadata,
+     *     the function immediately returns the coin_supply.
+     * (2) Assume there is metadata. Since there is metadata, there exists
+     *     a fungible asset supply. Extract the fungible asset supply. If
+     *     there was coin supply, we now adjust the coin supply by adding
+     *     the fungible asset supply to the coin supply. We then return
+     *     the sum of the two supply amounts.
+     * -Brent A. Ritterbeck; 20250107
+     *
+     * I need to improve the description above.
+     * -Brent A. Ritterbeck; 20250107
+     */
+    #[view]
+    pub fun
+    supply<CoinType>() : Option<u128>
+    acquires CoinInfo, CoinConversionMap
+    {
+        let coin_supply = coin_supply<CoinType>();
+        let metadata    = paired_metadata<CoinType>();
+
+        if(option::is_some(&metadata))
+        {
+            let fungible_asset_supply =
+                fungible_asset::supply(option::extract(&mut metadata));
+
+            if(option::is_some(&coin_supply))
+            {
+                let supply = option::borrow_mut(&mut coin_supply);
+                *supply = *supply +
+                    option::destroy_some(fungible_asset_supply);
+            };
+        };
+
+        coin_supply
+    }
+
+    /*
+     * Return the symbol of the coin, usually a shorter version of the name.
+     */
+    #[view]
+    public fun
+    symbol<CoinType>() : string::String
+    acquires CoinInfo
+    {
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).symbol
+    }
 }
